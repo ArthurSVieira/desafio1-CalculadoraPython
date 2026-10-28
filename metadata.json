@@ -1,0 +1,6 @@
+{
+  "name": "PyCalc Studio - Calculadora Python & Análise de Código",
+  "description": "Aplicação interativa da calculadora em Python com as quatro operações básicas, simulador de terminal REPL, inspeção de estado e análise arquitetural completa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
