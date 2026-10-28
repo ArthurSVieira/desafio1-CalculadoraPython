@@ -44,8 +44,11 @@ export const TerminalRepl: React.FC = () => {
       { id: '7', type: 'output', text: '  [2] Subtração (-)' },
       { id: '8', type: 'output', text: '  [3] Multiplicação (×)' },
       { id: '9', type: 'output', text: '  [4] Divisão (÷)' },
-      { id: '10', type: 'output', text: '  [0] Sair do programa' },
-      { id: '11', type: 'prompt', text: 'Digite a opção (número ou símbolo): ' },
+      { id: '10', type: 'output', text: '  [5] Porcentagem (%)' },
+      { id: '11', type: 'output', text: '  [6] Seno (sin)' },
+      { id: '12', type: 'output', text: '  [7] Cosseno (cos)' },
+      { id: '13', type: 'output', text: '  [0] Sair do programa' },
+      { id: '14', type: 'prompt', text: 'Digite a opção (número ou símbolo): ' },
     ]);
   };
 
@@ -94,7 +97,7 @@ export const TerminalRepl: React.FC = () => {
       newLines.push({
         id: Math.random().toString(),
         type: 'success',
-        text: '✔ Todos os 12 testes unitários passaram com 100% de conformidade.\n',
+        text: `✔ Todos os ${testResults.length} testes unitários passaram com 100% de conformidade.\n`,
       });
       newLines.push({ id: Math.random().toString(), type: 'prompt', text: getPromptText(replStep) });
       setLines((prev) => [...prev, ...newLines]);
@@ -128,14 +131,18 @@ export const TerminalRepl: React.FC = () => {
         newLines.push({
           id: Math.random().toString(),
           type: 'prompt',
-          text: 'Digite o primeiro número (A): ',
+          text: opMeta.isUnary
+            ? 'Digite o ângulo em graus: '
+            : opMeta.id === 'porcentagem'
+            ? 'Digite a porcentagem (A%): '
+            : 'Digite o primeiro número (A): ',
         });
         setLines((prev) => [...prev, ...newLines]);
       } else {
         newLines.push({
           id: Math.random().toString(),
           type: 'error',
-          text: `⚠ Opção inválida ('${rawVal}'). Por favor, digite 1, 2, 3, 4 ou o símbolo correspondente.`,
+          text: `⚠ Opção inválida ('${rawVal}'). Por favor, digite de 1 a 7 ou o símbolo correspondente.`,
         });
         newLines.push({
           id: Math.random().toString(),
@@ -148,6 +155,7 @@ export const TerminalRepl: React.FC = () => {
       const newLines: TerminalLine[] = [{ id: Math.random().toString(), type: 'input', text: rawVal }];
       const sanitized = trimmed.replace(',', '.');
       const num = Number(sanitized);
+      const opMeta = OPERACAO_POR_SIMBOLO[selectedOp!];
 
       if (isNaN(num) || sanitized === '' || !isFinite(num)) {
         newLines.push({
@@ -158,7 +166,36 @@ export const TerminalRepl: React.FC = () => {
         newLines.push({
           id: Math.random().toString(),
           type: 'prompt',
-          text: 'Digite o primeiro número (A): ',
+          text: opMeta.isUnary ? 'Digite o ângulo em graus: ' : 'Digite o primeiro número (A): ',
+        });
+        setLines((prev) => [...prev, ...newLines]);
+      } else if (opMeta.isUnary) {
+        newLines.push({
+          id: Math.random().toString(),
+          type: 'system',
+          text: 'Processando operação...',
+        });
+        const trace = executarOperacaoPython(num, 0, opMeta);
+        newLines.push({
+          id: Math.random().toString(),
+          type: 'success',
+          text: '\n--------------------------------------------------',
+        });
+        newLines.push({
+          id: Math.random().toString(),
+          type: 'success',
+          text: `✅ SUCESSO: ${opMeta.mathSymbol}(${formatarNumeroPython(num)}°) = ${trace.formattedResult}`,
+        });
+        newLines.push({
+          id: Math.random().toString(),
+          type: 'success',
+          text: '--------------------------------------------------',
+        });
+        setReplStep('ask_repeat');
+        newLines.push({
+          id: Math.random().toString(),
+          type: 'prompt',
+          text: '\nDeseja realizar outra operação? (S/n): ',
         });
         setLines((prev) => [...prev, ...newLines]);
       } else {
@@ -167,7 +204,7 @@ export const TerminalRepl: React.FC = () => {
         newLines.push({
           id: Math.random().toString(),
           type: 'prompt',
-          text: 'Digite o segundo número (B): ',
+          text: opMeta.id === 'porcentagem' ? 'Digite o valor base (B): ' : 'Digite o segundo número (B): ',
         });
         setLines((prev) => [...prev, ...newLines]);
       }
@@ -224,7 +261,10 @@ export const TerminalRepl: React.FC = () => {
           newLines.push({
             id: Math.random().toString(),
             type: 'success',
-            text: `✅ SUCESSO: ${formatarNumeroPython(num1)} ${opMeta.mathSymbol} ${formatarNumeroPython(num2)} = ${trace.formattedResult}`,
+            text:
+              opMeta.id === 'porcentagem'
+                ? `✅ SUCESSO: ${formatarNumeroPython(num1)}% de ${formatarNumeroPython(num2)} = ${trace.formattedResult}`
+                : `✅ SUCESSO: ${formatarNumeroPython(num1)} ${opMeta.mathSymbol} ${formatarNumeroPython(num2)} = ${trace.formattedResult}`,
           });
           newLines.push({
             id: Math.random().toString(),
@@ -262,6 +302,9 @@ export const TerminalRepl: React.FC = () => {
         newLines.push({ id: Math.random().toString(), type: 'output', text: '  [2] Subtração (-)' });
         newLines.push({ id: Math.random().toString(), type: 'output', text: '  [3] Multiplicação (×)' });
         newLines.push({ id: Math.random().toString(), type: 'output', text: '  [4] Divisão (÷)' });
+        newLines.push({ id: Math.random().toString(), type: 'output', text: '  [5] Porcentagem (%)' });
+        newLines.push({ id: Math.random().toString(), type: 'output', text: '  [6] Seno (sin)' });
+        newLines.push({ id: Math.random().toString(), type: 'output', text: '  [7] Cosseno (cos)' });
         newLines.push({ id: Math.random().toString(), type: 'output', text: '  [0] Sair do programa' });
         newLines.push({ id: Math.random().toString(), type: 'prompt', text: 'Digite a opção (número ou símbolo): ' });
         setLines((prev) => [...prev, ...newLines]);

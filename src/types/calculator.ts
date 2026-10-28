@@ -1,4 +1,11 @@
-export type OperationType = 'soma' | 'subtracao' | 'multiplicacao' | 'divisao';
+export type OperationType =
+  | 'soma'
+  | 'subtracao'
+  | 'multiplicacao'
+  | 'divisao'
+  | 'porcentagem'
+  | 'seno'
+  | 'cosseno';
 
 export interface OperationMeta {
   id: OperationType;
@@ -8,6 +15,7 @@ export interface OperationMeta {
   name: string;
   pythonFunc: string;
   docstring: string;
+  isUnary?: boolean;
   formula: (a: number, b: number) => number;
 }
 
@@ -15,6 +23,7 @@ export interface PythonExecutionTrace {
   operationName: string;
   operationSymbol: string;
   pythonFunction: string;
+  isUnary?: boolean;
   operandA: number;
   operandB: number;
   rawResult?: number;
@@ -31,7 +40,15 @@ export interface PythonExecutionTrace {
 export interface UnitTestResult {
   id: string;
   name: string;
-  category: 'Adição' | 'Subtração' | 'Multiplicação' | 'Divisão' | 'Casting' | 'Formatação';
+  category:
+    | 'Adição'
+    | 'Subtração'
+    | 'Multiplicação'
+    | 'Divisão'
+    | 'Porcentagem'
+    | 'Trigonometria'
+    | 'Casting'
+    | 'Formatação';
   expression: string;
   expected: string;
   actual: string;

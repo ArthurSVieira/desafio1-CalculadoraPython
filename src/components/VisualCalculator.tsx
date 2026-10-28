@@ -120,13 +120,24 @@ export const VisualCalculator: React.FC = () => {
     }
   };
 
-  // Porcentagem (%)
-  const handlePercentage = () => {
+  // Operações trigonométricas unárias (sin, cos)
+  const handleUnaryOperator = (opSymbol: 'sin' | 'cos') => {
     const val = parseFloat(displayValue.replace(',', '.'));
-    if (!isNaN(val)) {
-      const pct = val / 100;
-      setDisplayValue(formatarNumeroPython(pct));
+    if (isNaN(val)) return;
+
+    const opMeta = OPERACAO_POR_SIMBOLO[opSymbol];
+    const trace = executarOperacaoPython(val, 0, opMeta);
+    setLastTrace(trace);
+    setHistoryExpression(`${opMeta.mathSymbol}(${formatarNumeroPython(val)}°) =`);
+
+    if (trace.hasError) {
+      setDisplayValue('Erro');
+    } else {
+      setDisplayValue(formatarNumeroPython(trace.rawResult!));
     }
+    setStoredValue(null);
+    setActiveOperator(null);
+    setWaitingForSecondOperand(true);
   };
 
   // Apagar último dígito (Backspace)
@@ -150,7 +161,11 @@ export const VisualCalculator: React.FC = () => {
     setDisplayValue(b.toString());
     const trace = executarOperacaoPython(a, b, opMeta);
     setLastTrace(trace);
-    setHistoryExpression(`${formatarNumeroPython(a)} ${opMeta.mathSymbol} ${formatarNumeroPython(b)} =`);
+    setHistoryExpression(
+      opMeta.isUnary
+        ? `${opMeta.mathSymbol}(${formatarNumeroPython(a)}°) =`
+        : `${formatarNumeroPython(a)} ${opMeta.mathSymbol} ${formatarNumeroPython(b)} =`
+    );
     if (trace.hasError) {
       setDisplayValue('Erro');
     } else {
@@ -168,7 +183,7 @@ export const VisualCalculator: React.FC = () => {
         <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
           <span>Ambiente de Execução Python</span>
           <span aria-hidden="true">·</span>
-          <span>4 Operações Fundamentais</span>
+          <span>Operações Básicas, Porcentagem & Trigonometria</span>
           <span aria-hidden="true">·</span>
           <span>Inspeção em Tempo Real</span>
         </div>
@@ -177,7 +192,7 @@ export const VisualCalculator: React.FC = () => {
         </h1>
         <p className="mt-2 text-sm text-slate-400 max-w-3xl">
           Utilize o teclado da calculadora para interagir com as funções puras de
-          adição, subtração, multiplicação e divisão. O painel lateral inspeciona a memória,
+          adição, subtração, multiplicação, divisão, porcentagem, seno e cosseno. O painel lateral inspeciona a memória,
           pilha de execução e tratamento defensivo de exceções em tempo real.
         </p>
       </div>
@@ -202,6 +217,22 @@ export const VisualCalculator: React.FC = () => {
             </div>
           </div>
 
+          {/* Trigonometric Row */}
+          <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+            <button
+              onClick={() => handleUnaryOperator('sin')}
+              className="py-2.5 px-2 text-xs font-semibold rounded-lg bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800/40 transition-colors"
+            >
+              sin(θ°)
+            </button>
+            <button
+              onClick={() => handleUnaryOperator('cos')}
+              className="py-2.5 px-2 text-xs font-semibold rounded-lg bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800/40 transition-colors"
+            >
+              cos(θ°)
+            </button>
+          </div>
+
           {/* Keypad Grid */}
           <div className="grid grid-cols-4 gap-2.5">
             {/* Row 1: Function Keys */}
@@ -218,8 +249,12 @@ export const VisualCalculator: React.FC = () => {
               ±
             </button>
             <button
-              onClick={handlePercentage}
-              className="py-3 px-2 text-sm font-semibold rounded-lg bg-slate-800 hover:bg-slate-700/80 active:bg-slate-700 text-slate-300 transition-colors"
+              onClick={() => handleOperator('%')}
+              className={`py-3 px-2 text-sm font-semibold rounded-lg transition-colors ${
+                activeOperator === '%'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                  : 'bg-slate-800 hover:bg-slate-700/80 active:bg-slate-700 text-cyan-300'
+              }`}
             >
               %
             </button>

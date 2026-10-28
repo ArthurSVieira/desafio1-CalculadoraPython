@@ -43,12 +43,27 @@ def dividir(a: float, b: float) -> float:
     return a / b
 
 
+def porcentagem(a: float, b: float) -> float:
+    """Retorna 'a'% do valor 'b' ((a / 100) * b)."""
+    return (a / 100.0) * b
+
+
+def seno(angulo_graus: float) -> float:
+    """Retorna o seno de um ângulo informado em graus."""
+    return math.sin(math.radians(angulo_graus))
+
+
+def cosseno(angulo_graus: float) -> float:
+    """Retorna o cosseno de um ângulo informado em graus."""
+    return math.cos(math.radians(angulo_graus))
+
+
 # ==============================================================================
 # 2. TABELA DE ROTEAMENTO DECLARATIVO (DISPATCH TABLE)
 # ==============================================================================
 
-# Definição do tipo para funções matemáticas de dois operandos
-TipoOperacao = Callable[[float, float], float]
+# Definição do tipo para funções matemáticas (1 ou 2 operandos)
+TipoOperacao = Callable[..., float]
 
 # Mapeamento declarativo: Chave -> (Nome da Operação, Função Pura, Símbolo Matemático)
 TABELA_OPERACOES: Dict[str, Tuple[str, TipoOperacao, str]] = {
@@ -61,7 +76,17 @@ TABELA_OPERACOES: Dict[str, Tuple[str, TipoOperacao, str]] = {
     "x": ("Multiplicação", multiplicar, "×"),
     "4": ("Divisão", dividir, "÷"),
     "/": ("Divisão", dividir, "÷"),
+    "5": ("Porcentagem", porcentagem, "%"),
+    "%": ("Porcentagem", porcentagem, "%"),
+    "6": ("Seno", seno, "sin"),
+    "sin": ("Seno", seno, "sin"),
+    "sen": ("Seno", seno, "sin"),
+    "7": ("Cosseno", cosseno, "cos"),
+    "cos": ("Cosseno", cosseno, "cos"),
 }
+
+# Operações que recebem apenas um número (unárias)
+OPERACOES_UNARIAS = {"sin", "cos"}
 
 
 # ==============================================================================
@@ -108,6 +133,9 @@ def capturar_operacao() -> Tuple[str, TipoOperacao, str]:
         print("  [2] Subtração (-)")
         print("  [3] Multiplicação (×)")
         print("  [4] Divisão (÷)")
+        print("  [5] Porcentagem (%)")
+        print("  [6] Seno (sin)")
+        print("  [7] Cosseno (cos)")
         print("  [0] Sair do programa")
         
         escolha = input("Digite a opção (número ou símbolo): ").strip().lower()
@@ -119,7 +147,7 @@ def capturar_operacao() -> Tuple[str, TipoOperacao, str]:
         if escolha in TABELA_OPERACOES:
             return TABELA_OPERACOES[escolha]
             
-        print(f"⚠ Opção inválida ('{escolha}'). Por favor, digite 1, 2, 3, 4 ou o símbolo correspondente.")
+        print(f"⚠ Opção inválida ('{escolha}'). Por favor, digite de 1 a 7 ou o símbolo correspondente.")
 
 
 # ==============================================================================
@@ -143,7 +171,7 @@ def formatar_numero(valor: float, precisao_maxima: int = 8) -> str:
     # Tratamento para números com casas decimais: arredonda para eliminar ruído binário
     valor_arredondado = round(valor, precisao_maxima)
     
-    # Se após o arredondamento virou inteiro
+    # Se após o arredondamento virou inteiro (inclusive -0.0 -> 0)
     if valor_arredondado.is_integer() and abs(valor_arredondado) < 1e12:
         return f"{int(valor_arredondado)}"
         
@@ -165,22 +193,41 @@ def executar_ciclo_calculadora() -> None:
     nome_op, funcao_op, simbolo_op = capturar_operacao()
     
     print(f"\n--- Operação selecionada: {nome_op} ({simbolo_op}) ---")
-    num1 = capturar_numero("Digite o primeiro número (A): ")
-    num2 = capturar_numero("Digite o segundo número (B): ")
-    
-    print("\nProcessando operação...")
     
     try:
-        resultado = funcao_op(num1, num2)
-        
-        # Formata os operandos e o resultado para exibição limpa
-        str_num1 = formatar_numero(num1)
-        str_num2 = formatar_numero(num2)
-        str_res = formatar_numero(resultado)
-        
-        print("\n" + "-" * 50)
-        print(f"✅ SUCESSO: {str_num1} {simbolo_op} {str_num2} = {str_res}")
-        print("-" * 50)
+        if simbolo_op in OPERACOES_UNARIAS:
+            angulo = capturar_numero("Digite o ângulo em graus: ")
+            print("\nProcessando operação...")
+            resultado = funcao_op(angulo)
+            
+            str_angulo = formatar_numero(angulo)
+            str_res = formatar_numero(resultado)
+            
+            print("\n" + "-" * 50)
+            print(f"✅ SUCESSO: {simbolo_op}({str_angulo}°) = {str_res}")
+            print("-" * 50)
+        else:
+            if simbolo_op == "%":
+                num1 = capturar_numero("Digite a porcentagem (A%): ")
+                num2 = capturar_numero("Digite o valor base (B): ")
+            else:
+                num1 = capturar_numero("Digite o primeiro número (A): ")
+                num2 = capturar_numero("Digite o segundo número (B): ")
+            
+            print("\nProcessando operação...")
+            resultado = funcao_op(num1, num2)
+            
+            # Formata os operandos e o resultado para exibição limpa
+            str_num1 = formatar_numero(num1)
+            str_num2 = formatar_numero(num2)
+            str_res = formatar_numero(resultado)
+            
+            print("\n" + "-" * 50)
+            if simbolo_op == "%":
+                print(f"✅ SUCESSO: {str_num1}% de {str_num2} = {str_res}")
+            else:
+                print(f"✅ SUCESSO: {str_num1} {simbolo_op} {str_num2} = {str_res}")
+            print("-" * 50)
         
     except ZeroDivisionError as erro:
         print("\n" + "!" * 50)
@@ -244,6 +291,16 @@ def executar_testes_unitarios() -> bool:
     except ZeroDivisionError:
         divisao_por_zero_capturada = True
     assert divisao_por_zero_capturada, "Falha ao disparar ZeroDivisionError"
+    
+    # Testes de Porcentagem
+    assert porcentagem(10.0, 200.0) == 20.0, "Falha no cálculo de porcentagem básica"
+    assert porcentagem(50.0, 80.0) == 40.0, "Falha no cálculo de 50%"
+    
+    # Testes de Seno e Cosseno (em graus)
+    assert round(seno(30.0), 8) == 0.5, "Falha no cálculo de seno(30°)"
+    assert round(seno(90.0), 8) == 1.0, "Falha no cálculo de seno(90°)"
+    assert round(cosseno(60.0), 8) == 0.5, "Falha no cálculo de cosseno(60°)"
+    assert round(cosseno(90.0), 8) == 0.0, "Falha no cálculo de cosseno(90°)"
     
     print("✔ Todos os testes unitários passaram com 100% de conformidade.")
     return True

@@ -47,6 +47,38 @@ export const OPERACOES: Record<string, OperationMeta> = {
       return a / b;
     },
   },
+  '5': {
+    id: 'porcentagem',
+    key: '5',
+    symbol: '%',
+    mathSymbol: '%',
+    name: 'Porcentagem',
+    pythonFunc: 'porcentagem(a: float, b: float) -> float',
+    docstring: "Retorna 'a'% do valor 'b': (a / 100.0) * b.",
+    formula: (a: number, b: number) => (a / 100.0) * b,
+  },
+  '6': {
+    id: 'seno',
+    key: '6',
+    symbol: 'sin',
+    mathSymbol: 'sin',
+    name: 'Seno',
+    pythonFunc: 'seno(angulo_graus: float) -> float',
+    docstring: 'Retorna o seno de um ângulo informado em graus: math.sin(math.radians(a)).',
+    isUnary: true,
+    formula: (a: number) => Math.sin((a * Math.PI) / 180),
+  },
+  '7': {
+    id: 'cosseno',
+    key: '7',
+    symbol: 'cos',
+    mathSymbol: 'cos',
+    name: 'Cosseno',
+    pythonFunc: 'cosseno(angulo_graus: float) -> float',
+    docstring: 'Retorna o cosseno de um ângulo informado em graus: math.cos(math.radians(a)).',
+    isUnary: true,
+    formula: (a: number) => Math.cos((a * Math.PI) / 180),
+  },
 };
 
 // Aliases para símbolos comuns
@@ -58,10 +90,17 @@ export const OPERACAO_POR_SIMBOLO: Record<string, OperationMeta> = {
   '×': OPERACOES['3'],
   '/': OPERACOES['4'],
   '÷': OPERACOES['4'],
+  '%': OPERACOES['5'],
+  'sin': OPERACOES['6'],
+  'sen': OPERACOES['6'],
+  'cos': OPERACOES['7'],
   '1': OPERACOES['1'],
   '2': OPERACOES['2'],
   '3': OPERACOES['3'],
   '4': OPERACOES['4'],
+  '5': OPERACOES['5'],
+  '6': OPERACOES['6'],
+  '7': OPERACOES['7'],
 };
 
 /**
@@ -76,7 +115,7 @@ export function formatarNumeroPython(valor: number, precisaoMaxima: number = 8):
 
   // Se for inteiro exato
   if (Number.isInteger(valor) && Math.abs(valor) < 1e12) {
-    return valor.toString();
+    return Object.is(valor, -0) ? '0' : valor.toString();
   }
 
   // Arredonda para eliminar ruídos da representação IEEE 754
@@ -84,13 +123,13 @@ export function formatarNumeroPython(valor: number, precisaoMaxima: number = 8):
   const valorArredondado = Math.round((valor + Number.EPSILON) * fator) / fator;
 
   if (Number.isInteger(valorArredondado) && Math.abs(valorArredondado) < 1e12) {
-    return valorArredondado.toString();
+    return Object.is(valorArredondado, -0) ? '0' : valorArredondado.toString();
   }
 
   // Converte para string e limpa zeros desnecessários
   let str = valorArredondado.toFixed(precisaoMaxima);
   str = str.replace(/0+$/, '').replace(/\.$/, '');
-  return str;
+  return str === '-0' ? '0' : str;
 }
 
 /**
@@ -102,16 +141,23 @@ export function executarOperacaoPython(
   opMeta: OperationMeta
 ): PythonExecutionTrace {
   const startTime = performance.now();
+  const funcName = opMeta.pythonFunc.split('(')[0];
+  const callArgs = opMeta.isUnary
+    ? `angulo_graus=${formatarNumeroPython(a)}`
+    : `a=${formatarNumeroPython(a)}, b=${formatarNumeroPython(b)}`;
+
   const callStack: string[] = [
-    '<module> (calculadora.py:178)',
-    'main() (calculadora.py:165)',
-    'executar_ciclo_calculadora() (calculadora.py:126)',
-    `${opMeta.pythonFunc.split('(')[0]}(a=${formatarNumeroPython(a)}, b=${formatarNumeroPython(b)})`,
+    '<module> (calculadora.py:293)',
+    'main() (calculadora.py:216)',
+    'executar_ciclo_calculadora() (calculadora.py:165)',
+    `${funcName}(${callArgs})`,
   ];
 
   const steps: string[] = [
     `1. Roteamento: Operação identificada como "${opMeta.name}" (${opMeta.mathSymbol}).`,
-    `2. Verificação de tipos: a=${a} (float), b=${b} (float).`,
+    opMeta.isUnary
+      ? `2. Verificação de tipo (unária): angulo_graus=${a} (float).`
+      : `2. Verificação de tipos: a=${a} (float), b=${b} (float).`,
   ];
 
   let rawResult: number | undefined;
@@ -120,11 +166,20 @@ export function executarOperacaoPython(
   let errorType: PythonExecutionTrace['errorType'];
   let errorMessage: string | undefined;
 
-  const pseudoBytecode: string[] = [
-    `LOAD_GLOBAL    0 (${opMeta.pythonFunc.split('(')[0]})`,
-    `LOAD_CONST     1 (${a})`,
-    `LOAD_CONST     2 (${b})`,
-  ];
+  const pseudoBytecode: string[] = opMeta.isUnary
+    ? [
+        `LOAD_GLOBAL    0 (math)`,
+        `LOAD_METHOD    1 (${opMeta.symbol})`,
+        `LOAD_GLOBAL    0 (math)`,
+        `LOAD_METHOD    2 (radians)`,
+        `LOAD_FAST      0 (${a})`,
+        `CALL_METHOD    1`,
+      ]
+    : [
+        `LOAD_GLOBAL    0 (${funcName})`,
+        `LOAD_CONST     1 (${a})`,
+        `LOAD_CONST     2 (${b})`,
+      ];
 
   if (opMeta.id === 'divisao' && b === 0) {
     hasError = true;
@@ -144,13 +199,21 @@ export function executarOperacaoPython(
         throw new Error('OverflowError: Resultado ultrapassa limites numéricos.');
       }
       formattedResult = formatarNumeroPython(rawResult);
-      steps.push(`3. Execução matemática isolada: ${a} ${opMeta.symbol} ${b} = ${rawResult}`);
+      if (opMeta.isUnary) {
+        steps.push(`3. Conversão trigonométrica: math.radians(${a}°) -> math.${opMeta.symbol}(...) = ${rawResult}`);
+      } else if (opMeta.id === 'porcentagem') {
+        steps.push(`3. Cálculo percentual: (${a} / 100.0) * ${b} = ${rawResult}`);
+      } else {
+        steps.push(`3. Execução matemática isolada: ${a} ${opMeta.symbol} ${b} = ${rawResult}`);
+      }
       steps.push(`4. Formatação de saída: "${formattedResult}" (remoção de ruído binário IEEE 754).`);
       steps.push('5. Retorno ao chamador com código de sucesso 0.');
       
-      const opcode = opMeta.id === 'soma' ? 'BINARY_ADD' :
+      const opcode = opMeta.isUnary ? 'CALL_METHOD    1' :
+                     opMeta.id === 'soma' ? 'BINARY_ADD' :
                      opMeta.id === 'subtracao' ? 'BINARY_SUBTRACT' :
-                     opMeta.id === 'multiplicacao' ? 'BINARY_MULTIPLY' : 'BINARY_TRUE_DIVIDE';
+                     opMeta.id === 'multiplicacao' ? 'BINARY_MULTIPLY' :
+                     opMeta.id === 'porcentagem' ? 'BINARY_MULTIPLY' : 'BINARY_TRUE_DIVIDE';
       pseudoBytecode.push(opcode);
       pseudoBytecode.push('RETURN_VALUE');
     } catch (err: unknown) {
@@ -166,6 +229,7 @@ export function executarOperacaoPython(
     operationName: opMeta.name,
     operationSymbol: opMeta.mathSymbol,
     pythonFunction: opMeta.pythonFunc,
+    isUnary: opMeta.isUnary,
     operandA: a,
     operandB: b,
     rawResult,
@@ -414,6 +478,39 @@ export function executarSuiteTestes(): UnitTestResult[] {
       })(),
       durationUs: 6,
       explanation: 'Validação defensiva de guarda para impedir divisão por zero no divisor.',
+    },
+    {
+      id: 'test_porcentagem_basica',
+      name: 'Cálculo de porcentagem (10% de 200)',
+      category: 'Porcentagem',
+      expression: 'porcentagem(10.0, 200.0)',
+      expected: '20',
+      actual: formatarNumeroPython(OPERACOES['5'].formula(10, 200)),
+      passed: OPERACOES['5'].formula(10, 200) === 20,
+      durationUs: 3,
+      explanation: 'Calcula (a / 100.0) * b de forma precisa.',
+    },
+    {
+      id: 'test_seno_30_graus',
+      name: 'Seno de 30° (conversão para radianos)',
+      category: 'Trigonometria',
+      expression: 'seno(30.0)',
+      expected: '0.5',
+      actual: formatarNumeroPython(OPERACOES['6'].formula(30, 0)),
+      passed: formatarNumeroPython(OPERACOES['6'].formula(30, 0)) === '0.5',
+      durationUs: 4,
+      explanation: 'Converte 30° com math.radians() e calcula math.sin().',
+    },
+    {
+      id: 'test_cosseno_60_graus',
+      name: 'Cosseno de 60° (conversão para radianos)',
+      category: 'Trigonometria',
+      expression: 'cosseno(60.0)',
+      expected: '0.5',
+      actual: formatarNumeroPython(OPERACOES['7'].formula(60, 0)),
+      passed: formatarNumeroPython(OPERACOES['7'].formula(60, 0)) === '0.5',
+      durationUs: 4,
+      explanation: 'Converte 60° com math.radians() e calcula math.cos().',
     },
     {
       id: 'test_formatacao_inteiro',
